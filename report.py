@@ -22,20 +22,36 @@ import json
 ROOT = Path(__file__).resolve().parent
 SECTION_LABELS = {"frontier": "Dimensionnement", "ba": "Flux mensuels"}
 from fpdf import FPDF
+from matplotlib import font_manager
+from functools import wraps
 
 
-SOLEOL_ORANGE = (233, 78, 53)
-DARK = (0, 0, 0)
-TEXT = (35, 35, 35)
-MUTED = (100, 110, 120)
-BLUE = (37, 99, 235)
-GREEN = (34, 160, 85)
-ORANGE = (245, 130, 32)
-PURPLE = (126, 58, 242)
-LIGHT_BG = (248, 250, 252)
-LIGHT_ORANGE = (255, 244, 239)
-LIGHT_GREEN = (236, 253, 245)
-BORDER = (220, 225, 230)
+def _report_fonts_only(function):
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        for filename in ("Montserrat-Regular.ttf", "Montserrat-Bold.ttf"):
+            path = ROOT / "fonts" / filename
+            if not path.is_file():
+                raise OSError(f"Police du rapport manquante : {path}")
+            font_manager.fontManager.addfont(str(path))
+        with matplotlib.rc_context({"font.family": "Montserrat"}):
+            return function(*args, **kwargs)
+    return wrapped
+
+
+
+SOLEOL_ORANGE = (242, 177, 52)  # Kept as an internal name for backwards compatibility.
+DARK = (13, 43, 46)
+TEXT = (13, 43, 46)
+MUTED = (90, 107, 109)
+BLUE = (39, 170, 225)
+GREEN = (111, 175, 75)
+ORANGE = (242, 177, 52)
+PURPLE = (156, 122, 77)
+LIGHT_BG = (244, 241, 232)
+LIGHT_ORANGE = (255, 248, 230)
+LIGHT_GREEN = (238, 246, 232)
+BORDER = (207, 217, 213)
 
 CARD_TITLE_SIZE = 7
 CARD_VALUE_SIZE = 14
@@ -86,7 +102,7 @@ def _fit_value(pdf, value, width):
     size = pdf.font_size_pt
     while size > 7 and pdf.get_string_width(_tx(value)) > width:
         size -= .5
-        pdf.set_font("Arial", "B", size)
+        pdf.set_font("Montserrat", "B", size)
 
 
 def _safe_pct(num, den) -> float:
@@ -99,14 +115,26 @@ def _pdf_bytes(pdf: FPDF) -> bytes:
 
 
 class ReportPDF(FPDF):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for family, style, filename in (
+            ("Montserrat", "", "Montserrat-Regular.ttf"),
+            ("Montserrat", "B", "Montserrat-Bold.ttf"),
+            ("Eras", "", "Eras-Bold.otf"),
+        ):
+            path = ROOT / "fonts" / filename
+            if not path.is_file():
+                raise OSError(f"Police du rapport manquante : {path}")
+            self.add_font(family, style, str(path))
+
     def header(self):
         pass
 
     def footer(self):
         self.set_y(-10)
-        self.set_font("Arial", "", FOOTER_SIZE)
+        self.set_font("Montserrat", "", FOOTER_SIZE)
         self.set_text_color(*MUTED)
-        self.cell(0, 5, _tx("SOLEOL - Battery Sizer"), align="L")
+        self.cell(0, 5, _tx("ENERLIA - Battery Sizer"), align="L")
         self.set_y(-10)
         self.cell(0, 5, _tx(f"Page {self.page_no()} / {{nb}}"), align="R")
 
@@ -132,19 +160,19 @@ def _metric_box(
     pdf.rect(x, y, w, h, style="DF")
 
     pdf.set_xy(x + 4, y + 4)
-    pdf.set_font("Arial", "B", label_size)
+    pdf.set_font("Montserrat", "B", label_size)
     pdf.set_text_color(*TEXT)
     pdf.multi_cell(w - 8, 4, _tx(label.upper()), align="L")
 
     pdf.set_xy(x + 4, y + 13)
-    pdf.set_font("Arial", "B", value_size)
+    pdf.set_font("Montserrat", "B", value_size)
     pdf.set_text_color(*color)
     _fit_value(pdf, value, w - 8)
     pdf.cell(w - 8, 8, _tx(value), ln=True)
 
     if sub:
         pdf.set_xy(x + 4, y + h - 9)
-        pdf.set_font("Arial", "", sub_size)
+        pdf.set_font("Montserrat", "", sub_size)
         pdf.set_text_color(*MUTED)
         pdf.multi_cell(w - 8, 4, _tx(sub), align="L")
 
@@ -167,20 +195,20 @@ def _flow_metric_box(
 
     # Titre centré
     pdf.set_xy(x + 3, y + 4)
-    pdf.set_font("Arial", "B", 7.2)
+    pdf.set_font("Montserrat", "B", 7.2)
     pdf.set_text_color(*TEXT)
     pdf.cell(w - 6, 4, _tx(label.upper()), align="C")
 
     # Valeur colorée plus petite et parfaitement centrée
     pdf.set_xy(x + 3, y + 10.5)
-    pdf.set_font("Arial", "B", 12.5)
+    pdf.set_font("Montserrat", "B", 12.5)
     pdf.set_text_color(*color)
     pdf.cell(w - 6, 8, _tx(value), align="C")
 
     # Sous-titre centré
     if sub:
         pdf.set_xy(x + 3, y + h - 8)
-        pdf.set_font("Arial", "", 7)
+        pdf.set_font("Montserrat", "", 7)
         pdf.set_text_color(*MUTED)
         pdf.cell(w - 6, 4, _tx(sub), align="C")
 
@@ -189,11 +217,11 @@ def _info_box(pdf: FPDF, x: float, y: float, w: float, h: float, title: str, tex
     pdf.set_fill_color(*fill)
     pdf.rect(x, y, w, h, style="DF")
     pdf.set_xy(x + 5, y + 4)
-    pdf.set_font("Arial", "B", 8)
+    pdf.set_font("Montserrat", "B", 8)
     pdf.set_text_color(*border)
     pdf.cell(w - 10, 5, _tx(title), ln=True)
     pdf.set_xy(x + 5, y + 11)
-    pdf.set_font("Arial", "", 9)
+    pdf.set_font("Montserrat", "", 9)
     pdf.set_text_color(*TEXT)
     pdf.multi_cell(w - 10, 4, _tx(text))
 
@@ -224,7 +252,7 @@ def _financial_box(
     pdf.rect(x, y, w, h, style="DF")
 
     pdf.set_xy(x + 5, y + 4)
-    pdf.set_font("Arial", "B", 9)
+    pdf.set_font("Montserrat", "B", 9)
     pdf.set_text_color(*GREEN)
     pdf.cell(w - 10, 5, _tx("ÉCONOMIE FINANCIÈRE"))
 
@@ -260,17 +288,17 @@ def _financial_box(
 
     for yy, (label, energy, tariff, value) in zip(row_y, rows):
         pdf.set_xy(x + 5, yy)
-        pdf.set_font("Arial", "B", 6.4)
+        pdf.set_font("Montserrat", "B", 6.4)
         pdf.set_text_color(*TEXT)
         pdf.cell(31, 4, _tx(label))
 
         pdf.set_xy(x + 36, yy)
-        pdf.set_font("Arial", "", 6.2)
+        pdf.set_font("Montserrat", "", 6.2)
         pdf.set_text_color(*MUTED)
         pdf.cell(27, 4, _tx(f"{_kwh(energy)} kWh x {tariff:.3f}"), align="R")
 
         pdf.set_xy(x + 65, yy)
-        pdf.set_font("Arial", "B", 6.5)
+        pdf.set_font("Montserrat", "B", 6.5)
         pdf.set_text_color(*(GREEN if value >= 0 else ORANGE))
         sign = "-" if value < 0 else ""
         pdf.cell(24, 4, _tx(f"{sign}{_chf(abs(value))} CHF"), align="R")
@@ -279,17 +307,17 @@ def _financial_box(
     net_x = x + detail_w + 8
     net_w = w - detail_w - 13
     pdf.set_xy(net_x, y + 10)
-    pdf.set_font("Arial", "B", 6.8)
+    pdf.set_font("Montserrat", "B", 6.8)
     pdf.set_text_color(*MUTED)
     pdf.multi_cell(net_w, 3.5, _tx("ÉCONOMIE NETTE\nSUR LA PÉRIODE"), align="C")
 
     pdf.set_xy(net_x, y + 20)
-    pdf.set_font("Arial", "B", 17)
+    pdf.set_font("Montserrat", "B", 17)
     pdf.set_text_color(*GREEN)
     pdf.cell(net_w, 8, _tx(_chf(net_gain)), align="C")
 
     pdf.set_xy(net_x, y + 28)
-    pdf.set_font("Arial", "B", 8)
+    pdf.set_font("Montserrat", "B", 8)
     pdf.set_text_color(*GREEN)
     pdf.cell(net_w, 5, "CHF", align="C")
 
@@ -318,7 +346,7 @@ def _resolve_header_image() -> str | None:
 
 
 def _resolve_logo_path(logo_path: str | None = None) -> str | None:
-    """Return the first existing Soleol logo path, if available."""
+    """Return a supplied Enerlia logo, while keeping the PDF usable without one."""
     from pathlib import Path
 
     candidates = []
@@ -327,10 +355,10 @@ def _resolve_logo_path(logo_path: str | None = None) -> str | None:
 
     candidates.extend(
         [
-            Path("logo_soleol.png"),
-            Path("logo_soleol.jpg"),
-            Path("soleol_logo.png"),
-            Path("soleol_logo.jpg"),
+            Path("logo_enerlia.png"),
+            Path("logo_enerlia.jpg"),
+            Path("enerlia_logo.png"),
+            Path("enerlia_logo.jpg"),
         ]
     )
 
@@ -349,19 +377,19 @@ def _side_bar(pdf: FPDF, meta, tariff_profile: str, client_name: str = "", logo_
         pdf.image(resolved_logo, x=8, y=11, w=36)
     else:
         pdf.set_xy(8, 12)
-        pdf.set_font("Arial", "B", 16)
+        pdf.set_font("Eras", "", 16)
         pdf.set_text_color(255, 255, 255)
-        pdf.cell(36, 8, "SOLEOL SA", ln=True)
+        pdf.cell(36, 8, "ENERLIA", ln=True)
         pdf.set_x(8)
-        pdf.set_font("Arial", "", 8)
+        pdf.set_font("Montserrat", "", 8)
         pdf.set_text_color(230, 235, 240)
-        pdf.cell(36, 5, "ÉNERGIE SOLAIRE", ln=True)
+        pdf.cell(36, 5, "SMART ENERGY", ln=True)
 
     pdf.set_draw_color(*SOLEOL_ORANGE)
     pdf.line(8, 60, 20, 60)
 
     pdf.set_xy(8, 66)
-    pdf.set_font("Arial", "B", 7)
+    pdf.set_font("Montserrat", "B", 7)
     pdf.set_text_color(255, 255, 255)
     pdf.multi_cell(
         36,
@@ -380,12 +408,12 @@ def _side_bar(pdf: FPDF, meta, tariff_profile: str, client_name: str = "", logo_
     y = 92
     for label, val in infos:
         pdf.set_xy(8, y)
-        pdf.set_font("Arial", "B", SIDEBAR_LABEL_SIZE)
+        pdf.set_font("Montserrat", "B", SIDEBAR_LABEL_SIZE)
         pdf.set_text_color(*SOLEOL_ORANGE)
         pdf.cell(36, 4, _tx(label), ln=True)
 
         pdf.set_x(8)
-        pdf.set_font("Arial", "", SIDEBAR_VALUE_SIZE)
+        pdf.set_font("Montserrat", "", SIDEBAR_VALUE_SIZE)
         pdf.set_text_color(255, 255, 255)
         pdf.multi_cell(36, 4, _tx(val))
         y += 17
@@ -393,7 +421,7 @@ def _side_bar(pdf: FPDF, meta, tariff_profile: str, client_name: str = "", logo_
     pdf.line(8, 180, 20, 180)
 
     pdf.set_xy(8, 214)
-    pdf.set_font("Arial", "B", 9)
+    pdf.set_font("Montserrat", "B", 9)
     pdf.set_text_color(*SOLEOL_ORANGE)
     pdf.multi_cell(
         36,
@@ -411,17 +439,17 @@ def _plot_gain(frontier: pd.DataFrame, best, rec_gain_max: float) -> BytesIO:
         f.Import_avoided_kWh,
         "-o",
         lw=2.6,
-        color="#1565C0",
-        markerfacecolor="#1565C0",
-        markeredgecolor="#1565C0",
+        color="#27AAE1",
+        markerfacecolor="#27AAE1",
+        markeredgecolor="#27AAE1",
     )
-    ax.axvline(float(best.Cap_kWh), color="#6b7280", ls="--", lw=1.1)
+    ax.axvline(float(best.Cap_kWh), color="#6E7C7D", ls="--", lw=1.1)
     ax.scatter(
         [float(best.Cap_kWh)],
         [float(best.Import_avoided_kWh)],
         s=95,
         zorder=3,
-        color="#1565C0",
+        color="#27AAE1",
     )
     ax.set_title("Énergie achetée évité", fontsize=12, weight="bold")
     ax.set_xlabel("Capacité batterie (kWh)", fontsize=9, labelpad=8)
@@ -434,8 +462,8 @@ def _plot_gain(frontier: pd.DataFrame, best, rec_gain_max: float) -> BytesIO:
         xytext=(10, 20),
         textcoords="offset points",
         fontsize=8,
-        bbox=dict(boxstyle="round", fc="#fff4ef", ec="#e94e35", alpha=0.95),
-        arrowprops=dict(arrowstyle="->", color="#e94e35"),
+        bbox=dict(boxstyle="round", fc="#FFF8E6", ec="#F2B134", alpha=0.95),
+        arrowprops=dict(arrowstyle="->", color="#F2B134"),
     )
     fig.tight_layout(pad=1.4)
     buf = BytesIO()
@@ -490,9 +518,9 @@ def _plot_monthly_import(df, sim) -> BytesIO:
         s["Import avant"],
         marker="o",
         lw=2.5,
-        color="#1565C0",
-        markerfacecolor="#1565C0",
-        markeredgecolor="#1565C0",
+        color="#27AAE1",
+        markerfacecolor="#27AAE1",
+        markeredgecolor="#27AAE1",
         label="Import avant batterie",
     )
     ax.plot(
@@ -500,9 +528,9 @@ def _plot_monthly_import(df, sim) -> BytesIO:
         s["Import apres"],
         marker="o",
         lw=2.5,
-        color="#FB8C00",
-        markerfacecolor="#FB8C00",
-        markeredgecolor="#FB8C00",
+        color="#F2B134",
+        markerfacecolor="#F2B134",
+        markeredgecolor="#F2B134",
         label="Import apres batterie",
     )
     ax.set_ylabel("kWh/mois", fontsize=9)
@@ -528,9 +556,9 @@ def _plot_monthly_export(df, sim) -> BytesIO:
         s["Export avant"],
         marker="o",
         lw=2.5,
-        color="#2E7D32",
-        markerfacecolor="#2E7D32",
-        markeredgecolor="#2E7D32",
+        color="#6FAF4B",
+        markerfacecolor="#6FAF4B",
+        markeredgecolor="#6FAF4B",
         label="Export avant batterie",
     )
     ax.plot(
@@ -538,9 +566,9 @@ def _plot_monthly_export(df, sim) -> BytesIO:
         s["Export apres"],
         marker="o",
         lw=2.5,
-        color="#D32F2F",
-        markerfacecolor="#D32F2F",
-        markeredgecolor="#D32F2F",
+        color="#6E7C7D",
+        markerfacecolor="#6E7C7D",
+        markeredgecolor="#6E7C7D",
         label="Export apres batterie",
     )
     ax.set_ylabel("kWh/mois", fontsize=9)
@@ -567,7 +595,7 @@ def _page_1(
 
     x0 = 58
     pdf.set_xy(x0, 14)
-    pdf.set_font("Arial", "B", 17)
+    pdf.set_font("Montserrat", "B", 17)
     pdf.set_text_color(*SOLEOL_ORANGE)
     pdf.cell(140, 8, _tx("SYNTHESE ÉNERGÉTIQUE"), ln=True)
 
@@ -662,7 +690,7 @@ def _page_1(
     pdf.rect(energy_x, energy_y, w, energy_h, style="DF")
 
     pdf.set_xy(energy_x + 4, energy_y + 7)
-    pdf.set_font("Arial", "B", 8)
+    pdf.set_font("Montserrat", "B", 8)
     pdf.set_text_color(*GREEN)
     pdf.multi_cell(w - 8, 4, _tx("ÉNERGIE\nVALORISÉE"), align="C")
 
@@ -671,18 +699,18 @@ def _page_1(
 
     # Chiffre principal très visible, unité séparée.
     pdf.set_xy(energy_x + 3, energy_y + 27)
-    pdf.set_font("Arial", "B", 18)
+    pdf.set_font("Montserrat", "B", 18)
     pdf.set_text_color(*GREEN)
     _fit_value(pdf, _kwh(valorisation_energetique), w - 6)
     pdf.cell(w - 6, 9, _tx(_kwh(valorisation_energetique)), align="C")
 
     pdf.set_xy(energy_x + 3, energy_y + 37)
-    pdf.set_font("Arial", "B", 9)
+    pdf.set_font("Montserrat", "B", 9)
     pdf.set_text_color(*GREEN)
     pdf.cell(w - 6, 6, "kWh", align="C")
 
     pdf.set_xy(energy_x + 5, energy_y + 47)
-    pdf.set_font("Arial", "", 6.8)
+    pdf.set_font("Montserrat", "", 6.8)
     pdf.set_text_color(*MUTED)
     pdf.multi_cell(w - 10, 4, _tx("Énergie solaire\nrestituée au site"), align="C")
 
@@ -745,7 +773,7 @@ def _page_1(
     )
 
     pdf.set_xy(x0, note_y)
-    pdf.set_font("Arial", "", 8.2 if financial_enabled else 10)
+    pdf.set_font("Montserrat", "", 8.2 if financial_enabled else 10)
     pdf.set_text_color(*MUTED)
     pdf.multi_cell(
         145, 4,
@@ -773,7 +801,7 @@ def _page_1(
 
 def _page_2(pdf, df, meta, rec, best, big, sim):
     pdf.add_page()
-    pdf.set_font("Arial", "B", 15)
+    pdf.set_font("Montserrat", "B", 15)
     pdf.set_text_color(*TEXT)
     pdf.cell(0, 9, _tx("Graphiques principaux"), ln=True)
 
@@ -788,7 +816,7 @@ def _page_2(pdf, df, meta, rec, best, big, sim):
     pdf.image(monthly_export, x=10, y=181, w=188, h=62)
 
     pdf.set_xy(10, 275)
-    pdf.set_font("Arial", "", 7)
+    pdf.set_font("Montserrat", "", 7)
     pdf.set_text_color(*MUTED)
     pdf.multi_cell(188, 4, _tx("Le graphique principal montre l'énergie achetée au réseau qui peut etre evitée selon la capacité batterie. * : mois incomplet. Les deux courbes mensuelles separent l'effet de la batterie sur l'import et sur l'export réseau."))
 
@@ -796,7 +824,7 @@ def _page_2(pdf, df, meta, rec, best, big, sim):
 def _technical_page(pdf, meta, rec, sim, assumptions):
     pdf.add_page()
     pdf.set_xy(10, 10)
-    pdf.set_font("Arial", "B", 15)
+    pdf.set_font("Montserrat", "B", 15)
     pdf.set_text_color(*SOLEOL_ORANGE)
     pdf.cell(0, 9, _tx("ANALYSE TECHNIQUE"), ln=True)
     pdf.set_draw_color(*BORDER)
@@ -837,6 +865,7 @@ def _technical_page(pdf, meta, rec, sim, assumptions):
 
 
 
+@_report_fonts_only
 def generate_battery_report(*, df, meta, rec, sim, assumptions, client_name="", sections=None,
                             show_financial=False, capex_chf=None, tariff_schedule=None, logo_path=None):
     """Three original pages; corrections alter values and wording, never the layout."""
