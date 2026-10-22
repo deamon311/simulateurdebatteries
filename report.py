@@ -346,25 +346,27 @@ def _resolve_header_image() -> str | None:
 
 
 def _resolve_logo_path(logo_path: str | None = None) -> str | None:
-    """Return a supplied Enerlia logo, while keeping the PDF usable without one."""
-    from pathlib import Path
-
+    """Resolve the Enerlia logo from an explicit path or known local filenames."""
     candidates = []
+
     if logo_path:
         candidates.append(Path(logo_path))
 
-    candidates.extend(
-        [
-            Path("logo_enerlia.png"),
-            Path("logo_enerlia.jpg"),
-            Path("enerlia_logo.png"),
-            Path("enerlia_logo.jpg"),
-        ]
-    )
+    candidates.extend([
+        ROOT / "logo_enerlia.png",
+        ROOT / "Logo_Enerlia.png",
+        ROOT / "logo_enerlia.jpg",
+        ROOT / "enerlia_logo.png",
+        ROOT / "enerlia_logo.jpg",
+    ])
 
     for candidate in candidates:
-        if (ROOT / candidate).is_file():
-            return str(ROOT / candidate)
+        if candidate.is_file():
+            return str(candidate)
+        local_candidate = ROOT / candidate
+        if local_candidate.is_file():
+            return str(local_candidate)
+
     return None
 
 
@@ -374,7 +376,7 @@ def _side_bar(pdf: FPDF, meta, tariff_profile: str, client_name: str = "", logo_
 
     resolved_logo = _resolve_logo_path(logo_path)
     if resolved_logo:
-        pdf.image(resolved_logo, x=8, y=11, w=36)
+        pdf.image(resolved_logo, x=7, y=13, w=38, keep_aspect_ratio=True)
     else:
         pdf.set_xy(8, 12)
         pdf.set_font("Eras", "", 16)
